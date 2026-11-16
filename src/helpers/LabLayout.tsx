@@ -34,7 +34,7 @@ export default function LabLayout({ title, children, controls }: LabLayoutProps)
       </AppBar>
 
       {/* Canvas area */}
-      <Box sx={{ flex: 1, position: "relative" }}>{children}</Box>
+      <Box sx={{ flex: 1, position: "relative", minHeight: 0, overflow: "hidden" }}>{children}</Box>
 
       {/* Controls panel */}
       {controls && (

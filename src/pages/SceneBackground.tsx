@@ -1,7 +1,6 @@
-import { useState } from "react";
-import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { useState, useEffect, useRef } from "react";
 import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import Typography from "@mui/material/Typography";
@@ -16,38 +15,107 @@ const PRESETS: { label: string; color: string }[] = [
   { label: "White", color: "#ffffff" },
 ];
 
-function Scene({ bgColor }: { bgColor: string }) {
-  return (
-    <>
-      <color attach="background" args={[bgColor]} />
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[5, 5, 5]} intensity={1} />
-
-      {/* A simple box to give context */}
-      <mesh position={[-1.5, 0, 0]}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial color="#0070f3" />
-      </mesh>
-
-      {/* A sphere */}
-      <mesh position={[1.5, 0, 0]}>
-        <sphereGeometry args={[0.7, 32, 32]} />
-        <meshStandardMaterial color="#7928ca" />
-      </mesh>
-
-      {/* Ground plane */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.75, 0]}>
-        <planeGeometry args={[10, 10]} />
-        <meshStandardMaterial color="#333" side={THREE.DoubleSide} />
-      </mesh>
-
-      <OrbitControls />
-    </>
-  );
-}
-
 export default function SceneBackground() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
   const [bgColor, setBgColor] = useState("#000000");
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const width = container.clientWidth || 800;
+    const height = container.clientHeight || 600;
+
+    const scene = new THREE.Scene();
+    sceneRef.current = scene;
+
+    const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
+    camera.position.set(3, 2, 5);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(width, height);
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+    dirLight.position.set(5, 5, 5);
+    scene.add(dirLight);
+
+    // Context box
+    const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+    const boxMat = new THREE.MeshStandardMaterial({ color: 0x0070f3 });
+    const box = new THREE.Mesh(boxGeo, boxMat);
+    box.position.set(-1.5, 0, 0);
+    scene.add(box);
+
+    // Sphere
+    const sphereGeo = new THREE.SphereGeometry(0.7, 32, 32);
+    const sphereMat = new THREE.MeshStandardMaterial({ color: 0x7928ca });
+    const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+    sphere.position.set(1.5, 0, 0);
+    scene.add(sphere);
+
+    // Ground plane
+    const planeGeo = new THREE.PlaneGeometry(10, 10);
+    const planeMat = new THREE.MeshStandardMaterial({
+      color: 0x333333,
+      side: THREE.DoubleSide,
+    });
+    const plane = new THREE.Mesh(planeGeo, planeMat);
+    plane.rotation.x = -Math.PI / 2;
+    plane.position.set(0, -0.75, 0);
+    scene.add(plane);
+
+    const handleResize = () => {
+      if (!container) return;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      if (w === 0 || h === 0) return;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    };
+
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(container);
+
+    let animationFrameId: number;
+    const animate = () => {
+      animationFrameId = requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      resizeObserver.disconnect();
+      controls.dispose();
+      renderer.dispose();
+      boxGeo.dispose();
+      boxMat.dispose();
+      sphereGeo.dispose();
+      sphereMat.dispose();
+      planeGeo.dispose();
+      planeMat.dispose();
+      if (container.contains(renderer.domElement)) {
+        container.removeChild(renderer.domElement);
+      }
+      sceneRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    sceneRef.current.background = new THREE.Color(bgColor);
+  }, [bgColor]);
 
   const controls = (
     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center" }}>
@@ -86,9 +154,7 @@ export default function SceneBackground() {
 
   return (
     <LabLayout title="Scene Background" controls={controls}>
-      <Canvas camera={{ position: [3, 2, 5], fov: 50 }} style={{ width: "100%", height: "100%" }}>
-        <Scene bgColor={bgColor} />
-      </Canvas>
+      <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
     </LabLayout>
   );
 }

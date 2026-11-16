@@ -1,7 +1,6 @@
-import { useState } from "react";
-import { Canvas } from "@react-three/fiber";
-import { OrbitControls } from "@react-three/drei";
+import { useState, useEffect, useRef } from "react";
 import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
@@ -10,58 +9,129 @@ import LabLayout from "../helpers/LabLayout";
 
 type FogType = "none" | "linear" | "exponential";
 
-function Scene({
-  fogType,
-  fogColor,
-  near,
-  far,
-  density,
-}: {
-  fogType: FogType;
-  fogColor: string;
-  near: number;
-  far: number;
-  density: number;
-}) {
-
-  return (
-    <>
-      <color attach="background" args={[fogColor]} />
-      {fogType === "linear" && (
-        <fog attach="fog" args={[fogColor, near, far]} />
-      )}
-      {fogType === "exponential" && (
-        <fogExp2 attach="fog" args={[fogColor, density]} />
-      )}
-
-      <ambientLight intensity={0.4} />
-      <directionalLight position={[5, 8, 5]} intensity={1} />
-
-      {/* Row of boxes receding into the distance */}
-      {Array.from({ length: 12 }).map((_, i) => (
-        <mesh key={i} position={[0, 0, -i * 3]}>
-          <boxGeometry args={[1, 1, 1]} />
-          <meshStandardMaterial color={i % 2 === 0 ? "#0070f3" : "#7928ca"} />
-        </mesh>
-      ))}
-
-      {/* Ground plane */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.6, -15]}>
-        <planeGeometry args={[20, 40]} />
-        <meshStandardMaterial color="#444" side={THREE.DoubleSide} />
-      </mesh>
-
-      <OrbitControls />
-    </>
-  );
-}
-
 export default function Fog() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+
   const [fogType, setFogType] = useState<FogType>("linear");
   const [fogColor, setFogColor] = useState("#000000");
   const [near, setNear] = useState(1);
   const [far, setFar] = useState(25);
   const [density, setDensity] = useState(0.05);
+
+  // Initialize native Three.js scene
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const width = container.clientWidth || 800;
+    const height = container.clientHeight || 600;
+
+    // Scene
+    const scene = new THREE.Scene();
+    sceneRef.current = scene;
+
+    // Camera
+    const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 1000);
+    camera.position.set(3, 2, 5);
+
+    // Renderer
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(width, height);
+    container.appendChild(renderer.domElement);
+
+    // OrbitControls
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+
+    // Lights
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+    dirLight.position.set(5, 8, 5);
+    scene.add(dirLight);
+
+    // Geometries & Materials
+    const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+    const boxMat1 = new THREE.MeshStandardMaterial({ color: 0x0070f3 });
+    const boxMat2 = new THREE.MeshStandardMaterial({ color: 0x7928ca });
+
+    // Row of boxes receding into the distance
+    for (let i = 0; i < 12; i++) {
+      const box = new THREE.Mesh(boxGeo, i % 2 === 0 ? boxMat1 : boxMat2);
+      box.position.set(0, 0, -i * 3);
+      scene.add(box);
+    }
+
+    // Ground plane
+    const planeGeo = new THREE.PlaneGeometry(20, 40);
+    const planeMat = new THREE.MeshStandardMaterial({
+      color: 0x444444,
+      side: THREE.DoubleSide,
+    });
+    const ground = new THREE.Mesh(planeGeo, planeMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.set(0, -0.6, -15);
+    scene.add(ground);
+
+    // Handle resize
+    const handleResize = () => {
+      if (!container) return;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      if (w === 0 || h === 0) return;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    };
+
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(container);
+
+    // Animation loop
+    let animationFrameId: number;
+    const animate = () => {
+      animationFrameId = requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      resizeObserver.disconnect();
+      controls.dispose();
+      renderer.dispose();
+      boxGeo.dispose();
+      boxMat1.dispose();
+      boxMat2.dispose();
+      planeGeo.dispose();
+      planeMat.dispose();
+      if (container.contains(renderer.domElement)) {
+        container.removeChild(renderer.domElement);
+      }
+      sceneRef.current = null;
+    };
+  }, []);
+
+  // Update Fog and Background color dynamically
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+
+    const color = new THREE.Color(fogColor);
+    scene.background = color;
+
+    if (fogType === "linear") {
+      scene.fog = new THREE.Fog(color, near, far);
+    } else if (fogType === "exponential") {
+      scene.fog = new THREE.FogExp2(color, density);
+    } else {
+      scene.fog = null;
+    }
+  }, [fogType, fogColor, near, far, density]);
 
   const controls = (
     <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, alignItems: "center" }}>
@@ -129,9 +199,7 @@ export default function Fog() {
 
   return (
     <LabLayout title="Fog" controls={controls}>
-      <Canvas camera={{ position: [3, 2, 5], fov: 50 }} style={{ width: "100%", height: "100%" }}>
-        <Scene fogType={fogType} fogColor={fogColor} near={near} far={far} density={density} />
-      </Canvas>
+      <div ref={containerRef} style={{ width: "100%", height: "100%" }} />
     </LabLayout>
   );
 }

@@ -55,7 +55,7 @@ export default function Home() {
           Three.js Lab
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
-          Interactive experiments to learn Three.js with React Three Fiber
+          Interactive experiments to learn Three.js
         </Typography>
       </Box>
 
