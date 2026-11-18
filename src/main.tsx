@@ -7,6 +7,7 @@ import theme from "./theme";
 import Home from "./pages/Home";
 import SceneBackground from "./pages/SceneBackground";
 import Fog from "./pages/Fog";
+import PerspectiveCamera from "./pages/PerspectiveCamera";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -17,6 +18,7 @@ createRoot(document.getElementById("root")!).render(
           <Route path="/" element={<Home />} />
           <Route path="/scene-background" element={<SceneBackground />} />
           <Route path="/fog" element={<Fog />} />
+          <Route path="/perspective-camera" element={<PerspectiveCamera />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>

@@ -27,6 +27,13 @@ const topics: TopicCard[] = [
     path: "/fog",
     emoji: "🌫️",
   },
+  {
+    title: "PerspectiveCamera",
+    description:
+      "Visualize the camera frustum and interactively adjust FOV, near/far planes, and zoom.",
+    path: "/perspective-camera",
+    emoji: "📷",
+  },
 ];
 
 export default function Home() {
